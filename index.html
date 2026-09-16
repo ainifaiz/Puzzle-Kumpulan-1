@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Puzzle Digital — Kampung Harmoni</title>
+<style>
+  :root{
+    --brown:#7a4528;
+    --green:#2f8f5b;
+    --light:#fffaf0;
+    --gold:#f6c744;
+    --dark:#173b2a;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family: "Trebuchet MS", Arial, sans-serif;
+    background:linear-gradient(135deg,#dff6ff,#fff8d8);
+    color:#18352a;
+    min-height:100vh;
+  }
+  .wrap{max-width:1100px;margin:auto;padding:20px}
+  header{
+    background:white;
+    border-radius:24px;
+    padding:20px;
+    text-align:center;
+    box-shadow:0 10px 30px rgba(0,0,0,.12);
+    margin-bottom:18px;
+  }
+  h1{margin:0 0 8px;color:var(--brown);font-size:clamp(26px,4vw,42px)}
+  .mission{font-size:clamp(16px,2.2vw,21px);margin:0}
+  .instructions{
+    display:flex;flex-wrap:wrap;gap:10px;justify-content:center;
+    margin:15px 0;
+  }
+  .badge{
+    background:#fff;border:2px solid #e6d5a7;border-radius:999px;
+    padding:9px 14px;font-weight:bold
+  }
+  .controls{text-align:center;margin:14px 0}
+  button{
+    border:0;border-radius:14px;padding:12px 18px;margin:4px;
+    font-weight:bold;font-size:16px;cursor:pointer;
+    background:var(--green);color:white;box-shadow:0 5px 12px rgba(0,0,0,.15)
+  }
+  button.secondary{background:var(--brown)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  #status{
+    text-align:center;font-weight:bold;min-height:28px;margin:8px;
+  }
+  .puzzle-area{
+    display:grid;grid-template-columns:minmax(280px,700px) 280px;
+    gap:18px;align-items:start;justify-content:center;
+  }
+  .board{
+    background:#704229;padding:8px;border-radius:18px;
+    display:grid;grid-template-columns:repeat(4,1fr);
+    grid-template-rows:repeat(3,1fr);
+    aspect-ratio:4/3;gap:4px;
+    box-shadow:0 12px 25px rgba(0,0,0,.2);
+    touch-action:none;
+  }
+  .piece{
+    position:relative;min-width:0;min-height:0;
+    perspective:900px;cursor:grab;
+    user-select:none;
+  }
+  .piece.dragging{opacity:.35;transform:scale(.96)}
+  .piece.selected{outline:4px solid var(--gold);outline-offset:2px}
+  .inner{
+    position:absolute;inset:0;transition:transform .55s;
+    transform-style:preserve-3d;
+  }
+  .piece.flipped .inner{transform:rotateY(180deg)}
+  .face{
+    position:absolute;inset:0;backface-visibility:hidden;
+    border-radius:7px;overflow:hidden;
+  }
+  .front{
+    background-image:url("assets/kampung-harmoni.png");
+    background-size:400% 300%;
+    background-repeat:no-repeat;
+    border:1px solid rgba(255,255,255,.8);
+  }
+  .back{
+    transform:rotateY(180deg);
+    background:linear-gradient(145deg,#fffdf2,#e6f7df);
+    border:3px solid #6ba77d;
+    display:flex;align-items:center;justify-content:center;
+    text-align:center;padding:8px;
+    font-size:clamp(14px,2vw,22px);
+    font-weight:900;color:#24583a;
+  }
+  .back.small{font-size:14px;color:#7a684f}
+  .panel{
+    background:white;border-radius:20px;padding:18px;
+    box-shadow:0 10px 25px rgba(0,0,0,.12)
+  }
+  .panel h2{margin:0 0 8px;color:var(--brown)}
+  .panel p{margin:8px 0}
+  .slots{
+    display:flex;flex-wrap:wrap;gap:8px;margin-top:12px
+  }
+  .slot{
+    min-width:82px;min-height:42px;border:2px dashed #9dbca8;
+    border-radius:12px;padding:8px;background:#f7fff8;
+    display:flex;align-items:center;justify-content:center;
+    text-align:center;font-weight:bold;font-size:14px;
+  }
+  .word-bank{
+    display:flex;flex-wrap:wrap;gap:8px;margin-top:12px
+  }
+  .word{
+    background:#fff0ad;border:2px solid #e4b928;border-radius:12px;
+    padding:9px 12px;font-weight:900;cursor:grab;
+    touch-action:none;
+  }
+  .word.used{opacity:.35}
+  .success{
+    background:#e7f8e9;border:2px solid #54a866;color:#235b31;
+    border-radius:15px;padding:12px;margin-top:12px;font-weight:bold;
+    display:none;
+  }
+  .hint{
+    background:#fff8dc;border-left:5px solid var(--gold);
+    padding:10px;border-radius:10px;margin-top:10px;font-size:14px
+  }
+  @media(max-width:850px){
+    .puzzle-area{grid-template-columns:1fr}
+    .panel{order:2}
+  }
+</style>
+</head>
+
+<body>
+<div class="wrap">
+  <header>
+    <h1>🔐 Misi Kampung Harmoni</h1>
+    <p class="mission">“Kampung Harmoni kehilangan mesej rahsia. Susun puzzle untuk menemui mesej tersebut.”</p>
+    <div class="instructions">
+      <span class="badge">🧩 12 Keping Puzzle</span>
+      <span class="badge">🔄 Susun gambar</span>
+      <span class="badge">↩️ Balikkan kepingan</span>
+      <span class="badge">💬 Susun mesej rahsia</span>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button id="shuffleBtn">🔀 Kocak Puzzle</button>
+    <button id="flipBtn" disabled>↩️ Balikkan Semua Kepingan</button>
+    <button id="resetWords" class="secondary" disabled>🔄 Reset Mesej</button>
+  </div>
+
+  <div id="status">Susun 12 keping sehingga gambar Kampung Harmoni lengkap.</div>
+
+  <section class="puzzle-area">
+    <div id="board" class="board" aria-label="Papan puzzle 12 keping"></div>
+
+    <aside class="panel">
+      <h2>💡 Arahan Murid</h2>
+      <p><b>1.</b> Seret kepingan ke tempat yang betul.</p>
+      <p><b>2.</b> Apabila gambar lengkap, tekan <b>Balikkan Semua Kepingan</b>.</p>
+      <p><b>3.</b> Baca perkataan di belakang kepingan.</p>
+      <p><b>4.</b> Susun perkataan untuk membentuk mesej rahsia.</p>
+
+      <div class="hint">
+        <b>Petunjuk:</b> Mesej rahsia mempunyai <b>9 perkataan</b>.
+        Tiga keping lain mengandungi simbol hiasan.
+      </div>
+
+      <div id="messageSection" style="display:none">
+        <h2 style="margin-top:18px">🕵️ Mesej Rahsia</h2>
+        <p>Seret perkataan ke ruang mengikut urutan yang betul:</p>
+        <div id="slots" class="slots"></div>
+        <div id="wordBank" class="word-bank"></div>
+        <div id="success" class="success">
+          🎉 TAHNIAH! Mesej rahsia berjaya ditemui:<br>
+          <strong>KERJA MENJADI LEBIH MUDAH DAN CEPAT APABILA KITA BEKERJASAMA</strong>
+        </div>
+      </div>
+    </aside>
+  </section>
+</div>
+
+<script>
+const COLS = 4, ROWS = 3, TOTAL = 12;
+
+// 9 mesej + 3 keping hiasan.
+const secretWords = [
+  "KERJA","MENJADI","LEBIH","MUDAH","DAN","CEPAT","APABILA","KITA","BEKERJASAMA"
+];
+
+const wordPieceIds = {
+  0:"KERJA", 1:"MENJADI", 2:"LEBIH", 3:"MUDAH",
+  4:"DAN", 5:"CEPAT", 6:"APABILA", 7:"KITA", 8:"BEKERJASAMA",
+  9:"★", 10:"🌿", 11:"❤️"
+};
+
+const board = document.getElementById("board");
+const statusEl = document.getElementById("status");
+const shuffleBtn = document.getElementById("shuffleBtn");
+const flipBtn = document.getElementById("flipBtn");
+const resetWordsBtn = document.getElementById("resetWords");
+const messageSection = document.getElementById("messageSection");
+const slotsEl = document.getElementById("slots");
+const wordBankEl = document.getElementById("wordBank");
+const successEl = document.getElementById("success");
+
+let pieces = [];
+let selected = null;
+let flipped = false;
+
+function createPieces(){
+  pieces = Array.from({length:TOTAL}, (_,id)=>({id, pos:id}));
+  renderBoard();
+}
+
+function renderBoard(){
+  board.innerHTML = "";
+  const sorted = [...pieces].sort((a,b)=>a.pos-b.pos);
+
+  sorted.forEach(p=>{
+    const piece = document.createElement("div");
+    piece.className = "piece" + (flipped ? " flipped" : "");
+    piece.dataset.id = p.id;
+    piece.draggable = !flipped;
+
+    const inner = document.createElement("div");
+    inner.className = "inner";
+
+    const front = document.createElement("div");
+    front.className = "face front";
+    const r = Math.floor(p.id/COLS), c = p.id%COLS;
+    front.style.backgroundPosition = `${(c/(COLS-1))*100}% ${(r/(ROWS-1))*100}%`;
+
+    const back = document.createElement("div");
+    back.className = "face back" + (p.id>=9 ? " small" : "");
+    back.textContent = wordPieceIds[p.id];
+
+    inner.append(front,back);
+    piece.appendChild(inner);
+    board.appendChild(piece);
+
+    piece.addEventListener("dragstart", e=>{
+      if(flipped) return;
+      piece.classList.add("dragging");
+      e.dataTransfer.setData("text/plain", String(p.id));
+    });
+    piece.addEventListener("dragend", ()=>piece.classList.remove("dragging"));
+    piece.addEventListener("dragover", e=>{ if(!flipped) e.preventDefault(); });
+    piece.addEventListener("drop", e=>{
+      if(flipped) return;
+      e.preventDefault();
+      const fromId = Number(e.dataTransfer.getData("text/plain"));
+      swapPieces(fromId, p.id);
+    });
+
+    // Klik untuk pilih dua keping — mesra telefon/tablet.
+    piece.addEventListener("click", ()=>{
+      if(flipped) return;
+      if(selected === null){
+        selected = p.id;
+        piece.classList.add("selected");
+      }else{
+        swapPieces(selected,p.id);
+        selected = null;
+      }
+    });
+  });
+
+  if(selected !== null){
+    const el = board.querySelector(`[data-id="${selected}"]`);
+    if(el) el.classList.add("selected");
+  }
+}
+
+function swapPieces(idA,idB){
+  const a = pieces.find(x=>x.id===idA);
+  const b = pieces.find(x=>x.id===idB);
+  if(!a || !b || idA===idB) return;
+  [a.pos,b.pos] = [b.pos,a.pos];
+  selected = null;
+  renderBoard();
+  checkSolved();
+}
+
+function shuffle(){
+  flipped = false;
+  selected = null;
+  messageSection.style.display = "none";
+  resetWordsBtn.disabled = true;
+  successEl.style.display = "none";
+
+  // Fisher-Yates + pastikan bukan terus berada dalam keadaan siap.
+  do{
+    for(let i=pieces.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [pieces[i].pos,pieces[j].pos] = [pieces[j].pos,pieces[i].pos];
+    }
+  }while(isSolved());
+
+  flipBtn.disabled = true;
+  statusEl.textContent = "🔀 Puzzle telah dikocak. Susun sehingga gambar lengkap!";
+  renderBoard();
+}
+
+function isSolved(){
+  return pieces.every(p=>p.pos===p.id);
+}
+
+function checkSolved(){
+  if(isSolved()){
+    statusEl.textContent = "🎉 Gambar lengkap! Sekarang anda boleh membalikkan kepingan.";
+    flipBtn.disabled = false;
+  }else{
+    statusEl.textContent = "🧩 Teruskan menyusun kepingan sehingga gambar lengkap.";
+    flipBtn.disabled = true;
+  }
+}
+
+function flipAll(){
+  if(!isSolved()) return;
+  flipped = true;
+  selected = null;
+  renderBoard();
+  statusEl.textContent = "↩️ Kepingan telah dibalikkan. Cari dan susun mesej rahsia!";
+  messageSection.style.display = "block";
+  resetWordsBtn.disabled = false;
+  setupMessage();
+}
+
+function setupMessage(){
+  slotsEl.innerHTML = "";
+  wordBankEl.innerHTML = "";
+
+  secretWords.forEach((word,i)=>{
+    const slot = document.createElement("div");
+    slot.className = "slot";
+    slot.dataset.index = i;
+    slot.textContent = `${i+1}.`;
+    slotsEl.appendChild(slot);
+  });
+
+  // Bank perkataan dikocak.
+  [...secretWords].sort(()=>Math.random()-0.5).forEach(word=>{
+    const item = document.createElement("div");
+    item.className = "word";
+    item.textContent = word;
+    item.draggable = true;
+    item.dataset.word = word;
+
+    item.addEventListener("dragstart", e=>{
+      e.dataTransfer.setData("text/plain", word);
+    });
+
+    // Klik perkataan -> isi slot kosong pertama.
+    item.addEventListener("click", ()=>{
+      const empty = [...slotsEl.children].find(s=>!s.dataset.word);
+      if(empty) placeWord(empty,word,item);
+    });
+
+    wordBankEl.appendChild(item);
+  });
+
+  [...slotsEl.children].forEach(slot=>{
+    slot.addEventListener("dragover",e=>e.preventDefault());
+    slot.addEventListener("drop",e=>{
+      e.preventDefault();
+      const word=e.dataTransfer.getData("text/plain");
+      if(word) placeWord(slot,word);
+    });
+  });
+}
+
+function placeWord(slot,word,itemEl=null){
+  // Jika perkataan sudah digunakan, jangan gandakan.
+  if([...slotsEl.children].some(s=>s.dataset.word===word && s!==slot)) return;
+
+  slot.dataset.word=word;
+  slot.textContent=word;
+
+  [...wordBankEl.children].forEach(el=>{
+    if(el.dataset.word===word) el.classList.add("used");
+  });
+
+  checkMessage();
+}
+
+function checkMessage(){
+  const answer=[...slotsEl.children].map(s=>s.dataset.word||"");
+  const correct=answer.every(Boolean) && answer.join("|")===secretWords.join("|");
+  successEl.style.display=correct ? "block":"none";
+
+  if(correct){
+    statusEl.textContent="🏆 Mesej rahsia berjaya disusun!";
+  }
+}
+
+function resetWords(){
+  if(flipped) setupMessage();
+}
+
+shuffleBtn.addEventListener("click",shuffle);
+flipBtn.addEventListener("click",flipAll);
+resetWordsBtn.addEventListener("click",resetWords);
+
+createPieces();
+shuffle();
+</script>
+</body>
+</html>
